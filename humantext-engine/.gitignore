@@ -1,0 +1,55 @@
+# ── Python ──
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+
+# ── Virtual Environment ──
+.venv/
+venv/
+env/
+.python-version
+
+# ── Environment & Secrets ──
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# ── IDE ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Logs & Data ──
+logs/*.log
+logs/*.jsonl
+*.log
+outputs/
+data/writing_dna_profiles/
+
+# ── Testing ──
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# ── UV / Package Manager ──
+# uv.lock is committed for reproducible builds
+# .venv is NOT committed
+
+# ── Notebooks ──
+.ipynb_checkpoints/

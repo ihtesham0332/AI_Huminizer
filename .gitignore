@@ -1,0 +1,17 @@
+# Backend
+humantext-engine/__pycache__/
+humantext-engine/.pytest_cache/
+humantext-engine/.env
+humantext-engine/venv/
+humantext-engine/.venv/
+humantext-engine/env/
+
+# Frontend
+humantext-ui/node_modules/
+humantext-ui/.next/
+humantext-ui/out/
+humantext-ui/.env*.local
+
+# OS
+.DS_Store
+Thumbs.db
