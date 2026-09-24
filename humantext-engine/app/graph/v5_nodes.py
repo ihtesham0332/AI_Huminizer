@@ -41,21 +41,69 @@ def planning_node(state: HumanizerState) -> Dict[str, Any]:
     return {"budget": budget}
 
 from app.core.scrubber import AntiAIScrubber
+from app.humanizer_engine.pipeline import HumanizerEngine
+from app.humanizer_engine.providers import OllamaProvider
+from app.humanizer_engine.config import EngineConfig
+
+# Initialize verifiable engine
+_engine_provider = OllamaProvider()
+_humanizer_engine = HumanizerEngine(provider=_engine_provider, config=EngineConfig(cache_size=0))
 
 # 3. Generation Node
 def generate_node(state: HumanizerState) -> Dict[str, Any]:
-    budget = state["budget"]
+    budget = state.get("budget", {})
+    text = state["original_text"]
     
     if budget.get("skip_llm", False):
-        scrubbed_fallback = AntiAIScrubber.scrub(state["original_text"])
+        scrubbed_fallback = AntiAIScrubber.scrub(text)
         return {"candidates": [scrubbed_fallback]}
         
-    tier = budget.get("model_tier", "tier1")
+    mode = state.get("mode", "balanced")
     
+    # Map mode to HumanizerEngine level (1=light, 3=balanced, 4=deep, 5=ghost/radical)
+    level_map = {
+        "fast": 2,
+        "light": 2,
+        "balanced": 3,
+        "deep": 4,
+        "ghost": 5,
+        "creative": 4
+    }
+    level = level_map.get(mode, 3)
+    
+    # Tone mapping
+    tone = "casual" if mode in ("ghost", "creative", "balanced") else "standard"
+    voice_sample = state.get("profile_instructions")
+    
+    try:
+        # Run verifiable multi-stage engine:
+        # 1. Mask entities (numbers, dates, quotes, citations, URLs) as ⟦E#⟧
+        # 2. Paragraph segmentation with preceding/following context
+        # 3. Stylometry analysis (burstiness, template score)
+        # 4. Level-controlled candidate generation
+        # 5. Hard verification gates (entity multiset match, no invented digits)
+        # 6. Candidate ranking & critique revision loop
+        # 7. Byte-for-byte entity restoration
+        # 8. AntiAIScrubber post-processing
+        engine_res = _humanizer_engine.humanize_sync(
+            text,
+            level=level,
+            tone=tone,
+            voice_sample=voice_sample
+        )
+        final_text = AntiAIScrubber.scrub(engine_res.text)
+        return {
+            "candidates": [final_text],
+            "engine_report": engine_res.report
+        }
+    except Exception as e:
+        print(f"HumanizerEngine execution warning: {e}. Falling back to prompt router...")
+        
+    # High-performance fallback: Prompt with Few-Shot in-context learning
+    tier = budget.get("model_tier", "tier1")
     facts_str = ", ".join([f["value"] for f in state.get("facts", [])])
     citations_str = ", ".join([c["value"] for c in state.get("citations", [])])
     
-    # 1. Anti-AI Human Ghostwriter Master Prompt with Few-Shot Demonstration
     prompt = (
         "You are an authentic human writer sharing personal thoughts or advice with a friend or colleague.\n"
         "Completely rewrite the message below in your own natural words so that it reads 100% human and completely avoids AI detection patterns.\n\n"
@@ -68,61 +116,24 @@ def generate_node(state: HumanizerState) -> Dict[str, Any]:
         "6. ABSOLUTELY NO HASHTAGS: Do NOT include any hashtags (#...) anywhere in your output.\n"
         "7. NO AI CLICHES: Never use words like 'enlightening', 'delved into', 'fostering', 'robust', 'lifeline', 'in essence', 'in conclusion', 'in closing', 'invaluable', 'testament', 'tapestry'.\n"
     )
-    
     if facts_str:
         prompt += f"8. RETAIN CORE FACTS EXACTLY: {facts_str}\n"
     if citations_str:
         prompt += f"9. PRESERVE CITATIONS: {citations_str}\n"
         
-    # 2. Inject Length Constraint
-    length = state.get("length", "maintain")
-    if length == "condense":
-        prompt += "10. LENGTH: Significantly CONDENSE the text. Make it super punchy, short, and conversational.\n"
-    elif length == "expand":
-        prompt += "10. LENGTH: EXPAND the text with natural storytelling details and vivid explanations.\n"
-        
-    # 3. Inject Mode Constraint
-    mode = state.get("mode", "balanced")
-    if mode == "ghost":
-        prompt += "11. GHOST MODE: Radically restructure all clauses and use unexpected, fresh idioms to completely break AI watermarks.\n"
-    elif mode == "deep":
-        prompt += "11. DEEP MODE: Rich, thoughtful human phrasing with grounded, real-world context.\n"
-    elif mode == "creative":
-        prompt += "11. CREATIVE MODE: Engaging, vivid narrative style with personal anecdotes.\n"
-        
-    # 4. Inject DNA Profile
-    if state.get("profile_instructions"):
-        prompt += f"WRITING DNA PROFILE INSTRUCTIONS: {state['profile_instructions']}\n"
-        
-    # 5. Few-Shot In-Context Examples
     prompt += (
         "\n---\n"
-        "EXAMPLE 1 (0% AI Human Rewrite):\n"
-        "Original AI:\n"
-        "\"Today, I had the pleasure of engaging in a meaningful learning session with Dr. Alan Green, who shared his profound insights on machine learning. This conversation was particularly enlightening, as it delved into the true essence of algorithmic optimization. I am deeply grateful for his invaluable knowledge. #AI #Tech\"\n\n"
-        "Humanized (0% AI):\n"
-        "\"I spent an hour catching up with Dr. Alan Green this morning about machine learning. Honestly, it was eye-opening. We didn't just rehash textbook basics—we talked about what actually breaks when algorithms hit real production data. Left with a completely fresh perspective on optimization. Really glad he took the time to share his thoughts.\"\n\n"
-        "EXAMPLE 2 (0% AI Human Rewrite):\n"
+        "EXAMPLE (0% AI Human Rewrite):\n"
         "Original AI:\n"
         "\"Today, I had a great session with Sir Muhammad Akif on an important topic: Networking and Relationships. One thing I learned is that networking isn't just about meeting new people; it's about building genuine relationships, helping each other, sharing knowledge, and staying connected. Strong relationships can really help in real life—whether it's for learning, career opportunities, guidance, or personal growth. A strong network is built on trust, respect, and consistency. Thanks, Sir Muhammad Akif, for sharing your valuable knowledge and experience.\"\n\n"
         "Humanized (0% AI):\n"
         "\"Had a long chat with Sir Muhammad Akif earlier about networking. Most people overcomplicate it. They treat it like a numbers game, collecting cards or messaging strangers online. But real connections come down to three simple things: trust, respect, and actually keeping in touch over time. When you help people out without expecting anything right away, opportunities naturally follow. Good conversation and definitely gave me plenty to think about.\"\n"
         "---\n\n"
+        f"Original Text to Rewrite:\n{text}\n\nHumanized Version:"
     )
     
-    # 6. Append Original Text
-    prompt += f"Original Text to Rewrite:\n{state['original_text']}\n\nHumanized Version:"
-    
-    # If this is a revision loop, append the critique
-    if state.get("revision_count", 0) > 0:
-        prompt += f"\n\nCRITIQUE FROM LAST ATTEMPT: {state['quality_report'].get('reason')}. Fix this immediately."
-    
-    # Generate candidate
     raw_output = model_router.invoke_with_fallback(tier, prompt)
-    
-    # Run through deterministic AntiAIScrubber
     scrubbed_output = AntiAIScrubber.scrub(raw_output)
-    
     return {"candidates": [scrubbed_output]}
 
 # 4. Critique Node
