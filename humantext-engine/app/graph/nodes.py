@@ -100,6 +100,20 @@ def rewriter_node(state: Dict[str, Any]) -> Dict[str, Any]:
     text = state.get("original_text", "")
     mode = state.get("target_mode", "natural")
     tone = state.get("target_tone", "clear")
+    bypass_strength = state.get("bypass_strength", "standard")
+    
+    # Map bypass strength to temperature
+    temp_map = {
+        "standard": 0.6,
+        "high": 0.85,
+        "extreme": 1.0
+    }
+    temperature = temp_map.get(bypass_strength.lower(), 0.85)
+    
+    # Map bypass strength to prompt strictness
+    strength_rules = ""
+    if bypass_strength.lower() == "extreme":
+        strength_rules = "7. EXTREME BURSTINESS: You must heavily disrupt the sentence structure. Combine short punchy sentences with long, complex multi-clause sentences. Do not maintain a uniform rhythm.\n"
     
     # Build a proper LangChain Prompt
     from langchain_core.prompts import PromptTemplate
@@ -110,18 +124,18 @@ def rewriter_node(state: Dict[str, Any]) -> Dict[str, Any]:
         "1. PRESERVE STRUCTURE: You MUST keep the exact same paragraph structure, line breaks, bullet points, and formatting as the original text. Only change the words and phrasing, do NOT change the layout.\n"
         "2. ZERO PLAGIARISM: Do not copy the original sentence structures. Rewrite the concepts using your own entirely original phrasing.\n"
         "3. HIGH READABILITY: Use natural, everyday vocabulary. Do not use overly complex or archaic words. Keep the flow smooth and easy to read.\n"
-        "4. NATURAL RHYTHM: Vary your sentence lengths naturally. Use a mix of short and medium sentences. Avoid repetitive starting words (e.g., don't start every sentence with 'The' or 'This').\n"
-        "5. NO AI JARGON: Strictly avoid words like 'delve', 'testament', 'crucial', 'multifaceted', 'moreover', 'furthermore', 'tapestry', 'realm', 'foster', 'underscore', and 'leverage'.\n"
-        "6. VOICE: Write in a highly human, {tone} tone. Use active voice.\n\n"
+        "4. NATURAL RHYTHM: Vary your sentence lengths naturally. Use a mix of short and medium sentences. Avoid repetitive starting words.\n"
+        "5. NO AI JARGON: Strictly avoid words like 'delve', 'testament', 'crucial', 'multifaceted', 'moreover', 'tapestry', 'realm', 'foster', 'underscore', and 'leverage'.\n"
+        "6. VOICE: Write in a highly human, {tone} tone. Use active voice.\n"
+        f"{strength_rules}\n"
         "Original Text:\n{text}\n\n"
         "Return ONLY the absolute final, perfectly humanized text. Do not include any notes."
     )
     
     # Execute the LLM
     try:
-        # Turn off structured format temporarily just for the rewriter node so it outputs raw string
         from langchain_ollama import ChatOllama
-        local_llm = ChatOllama(model="qwen2.5:3b", temperature=0.95)
+        local_llm = ChatOllama(model="qwen2.5:3b", temperature=temperature)
         chain = prompt | local_llm
         response = chain.invoke({"tone": tone, "text": text})
         optimized = response.content if hasattr(response, "content") else str(response)

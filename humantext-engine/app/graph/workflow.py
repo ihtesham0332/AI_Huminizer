@@ -1,126 +1,76 @@
-from typing import Dict, Any, TypedDict, List, Optional
-try:
-    from langgraph.graph import StateGraph, END
-except ImportError:
-    # Fallback mock for testing environment if langgraph is missing
-    class StateGraph:
-        def __init__(self, state_schema): pass
-        def add_node(self, name, node): pass
-        def add_edge(self, source, target): pass
-        def set_entry_point(self, name): pass
-        def add_conditional_edges(self, source, condition, mapping): pass
-        def compile(self): return self
-        def invoke(self, state): return state
-    END = "__end__"
+from langgraph.graph import StateGraph, END
+from app.graph.state import HumanizationState
+from app.agents.input_analyzer import analyze_input_text
+from app.guardians.fact_guardian import fact_guardian_node
+from app.guardians.citation_guardian import citation_guardian_node
+from app.agents.humanization_planner import plan_humanization_node
+from app.agents.humanizer import humanizer_node
+from app.agents.evaluators.quality_critic import quality_critic_node
 
-from app.graph.nodes import (
-    input_validator_node, document_analyst_node, semantic_analyst_node,
-    style_analyst_node, context_analyst_node, planner_node,
-    rewriter_node, semantic_validator_node, fact_validator_node,
-    style_critic_node, quality_judge_node, revision_agent_node
-)
+def analyze_input_node(state: dict) -> dict:
+    """Wrapper to run the Input Analyzer and store in metadata."""
+    res = analyze_input_text(state["original_text"])
+    return {"metadata": res.model_dump(), "iteration_count": state.get("iteration_count", 0)}
 
-# Using TypedDict for LangGraph compatibility with our Pydantic StateSchema fields
-class GraphState(TypedDict, total=False):
-    request_id: str
-    original_text: str
-    document_type: str
-    target_mode: str
-    target_tone: Optional[str]
-    status: str
+def evaluate_and_route(state: dict) -> str:
+    """
+    Conditional edge logic based on Quality Critic results.
+    """
+    if state.get("best_candidate"):
+        return "finalize"
     
-    document_analysis: Dict[str, Any]
-    semantic_analysis: Dict[str, Any]
-    style_analysis: Dict[str, Any]
-    context_analysis: Dict[str, Any]
-    readability_analysis: Dict[str, Any]
+    if state.get("iteration_count", 0) >= 3:
+        # Hard cap reached. Force finalize with the first candidate.
+        print("WARNING: Max iterations reached. Forcing finalization.")
+        return "finalize"
     
-    claims: List[Dict[str, Any]]
-    facts: Dict[str, Any]
-    entities: List[Dict[str, Any]]
-    constraints: List[Dict[str, Any]]
-    
-    transformation_plan: Dict[str, Any]
-    rewritten_text: Optional[str]
-    
-    semantic_score: Optional[float]
-    factual_score: Optional[float]
-    style_score: Optional[float]
-    readability_score: Optional[float]
-    naturalness_score: Optional[float]
-    quality_score: Optional[float]
-    
-    validation_errors: List[str]
-    revision_count: int
-    revision_history: List[Dict[str, Any]]
-    
-    agent_metadata: Dict[str, Any]
+    # Needs a rewrite
+    # Increment iteration count here, or in another node. Let's do it simply here via state update if possible, 
+    # but routing doesn't update state. State update happens in nodes. 
+    # For now, rely on `iteration_count` being updated in the `humanize` node or somewhere else.
+    return "humanize"
 
-def route_after_validation(state: GraphState) -> str:
-    """Routes based on input validation."""
-    if state.get("status") == "failed":
-        return END
-    return "analyze"
-
-def route_after_judgment(state: GraphState) -> str:
-    """Routes based on quality score and revision limits."""
-    if state.get("status") == "completed":
-        return END
-    if state.get("revision_count", 0) >= 3: # MAX_REVISIONS
-        state["status"] = "completed_with_warnings"
-        return END
-    return "revise"
-
-def build_graph():
-    """Builds the LangGraph orchestration workflow."""
-    workflow = StateGraph(GraphState)
-    
-    # 1. Validation
-    workflow.add_node("validate_input", input_validator_node)
-    
-    # 2. Parallel Analysis (Mocked as sequential due to pure functional setup here, 
-    # but logically these form the 'analyze' stage)
-    def parallel_analysis(state: GraphState):
-        state.update(document_analyst_node(state))
-        state.update(semantic_analyst_node(state))
-        state.update(style_analyst_node(state))
-        state.update(context_analyst_node(state))
-        return state
+def finalize_node(state: dict) -> dict:
+    """Sets the final output and ends the loop."""
+    best = state.get("best_candidate")
+    if not best and state.get("candidates"):
+        best = state["candidates"][0] # Fallback
         
-    workflow.add_node("analyze", parallel_analysis)
+    return {"final_output": best, "change_summary": "Processed via LangGraph."}
+
+def build_humanization_graph():
+    """Builds and compiles the state graph."""
+    workflow = StateGraph(HumanizationState)
+
+    # Add Nodes
+    workflow.add_node("analyze_input", analyze_input_node)
+    workflow.add_node("extract_facts", fact_guardian_node)
+    workflow.add_node("extract_citations", citation_guardian_node)
+    workflow.add_node("plan", plan_humanization_node)
+    workflow.add_node("humanize", humanizer_node)
+    workflow.add_node("critic", quality_critic_node)
+    workflow.add_node("finalize", finalize_node)
+
+    # Add Edges (Linear up to planning)
+    workflow.set_entry_point("analyze_input")
+    workflow.add_edge("analyze_input", "extract_facts")
+    workflow.add_edge("extract_facts", "extract_citations")
+    workflow.add_edge("extract_citations", "plan")
     
-    # 3. Planning & Rewriting
-    workflow.add_node("plan", planner_node)
-    workflow.add_node("rewrite", rewriter_node)
+    # The Loop
+    workflow.add_edge("plan", "humanize")
+    workflow.add_edge("humanize", "critic")
     
-    # 4. Parallel Validation
-    def parallel_validation(state: GraphState):
-        state.update(semantic_validator_node(state))
-        state.update(fact_validator_node(state))
-        state.update(style_critic_node(state))
-        return state
-        
-    workflow.add_node("validate_output", parallel_validation)
-    
-    # 5. Judgment & Revision
-    workflow.add_node("judge", quality_judge_node)
-    workflow.add_node("revise", revision_agent_node)
-    
-    # Build Edges
-    workflow.set_entry_point("validate_input")
-    workflow.add_conditional_edges("validate_input", route_after_validation, {"analyze": "analyze", END: END})
-    workflow.add_edge("analyze", "plan")
-    workflow.add_edge("plan", "rewrite")
-    workflow.add_edge("rewrite", "validate_output")
-    workflow.add_edge("validate_output", "judge")
-    
+    # Conditional Routing
     workflow.add_conditional_edges(
-        "judge", 
-        route_after_judgment, 
-        {END: END, "revise": "revise"}
+        "critic",
+        evaluate_and_route,
+        {
+            "humanize": "humanize",
+            "finalize": "finalize"
+        }
     )
-    workflow.add_edge("revise", "plan") # Loop back to planner
+    
+    workflow.add_edge("finalize", END)
     
     return workflow.compile()
-
-app_graph = build_graph()

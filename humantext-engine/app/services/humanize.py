@@ -17,6 +17,7 @@ def run_humanize_workflow(request: HumanizeRequest) -> HumanizeResponse:
         "document_type": request.document_type,
         "target_mode": request.target_mode,
         "target_tone": request.target_tone,
+        "bypass_strength": request.bypass_strength,
         "status": "initialized",
         
         "document_analysis": {},

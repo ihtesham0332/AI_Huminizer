@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "HumanText Engine",
+  "version": "1.0",
+  "description": "Instantly humanize AI text from anywhere using the HumanText LangGraph Agentic Engine.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Humanize Text"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*"
+  ]
+}

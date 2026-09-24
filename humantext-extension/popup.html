@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HumanText Engine</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>HumanText</h1>
+      <span class="status">Local Qwen2.5 Online</span>
+    </div>
+    
+    <div class="input-section">
+      <label for="inputText">Paste AI Text Here:</label>
+      <textarea id="inputText" rows="5" placeholder="Detect AI text and rewrite it..."></textarea>
+    </div>
+    
+    <div class="controls">
+      <label for="strengthSelect">Strength:</label>
+      <select id="strengthSelect">
+        <option value="light">Ninja (Light)</option>
+        <option value="medium" selected>Balanced (Medium)</option>
+        <option value="aggressive">Ghost (Aggressive)</option>
+      </select>
+    </div>
+    
+    <button id="humanizeBtn">Humanize Text</button>
+    
+    <div class="output-section">
+      <label for="outputText">Humanized Candidate:</label>
+      <textarea id="outputText" rows="6" readonly placeholder="Output will appear here..."></textarea>
+      <button id="copyBtn" class="secondary-btn">Copy to Clipboard</button>
+    </div>
+    
+    <div id="loader" class="hidden">
+      Processing through LangGraph Agents...
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -6,7 +6,7 @@ import sys
 # Ensure app directory is in path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.api.v1.endpoints import humanize
+from app.api.v1.endpoints import billing, humanize_v5
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -24,8 +24,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include the new endpoint router
-app.include_router(humanize.router, prefix="/api/v1", tags=["Humanization"])
+# Include the new V5 endpoint router
+app.include_router(humanize_v5.router, prefix="/api/v1", tags=["V5 Agentic Humanization"])
+app.include_router(billing.router, prefix="/api/v1/billing", tags=["Monetization"])
 
 @app.get("/")
 async def root():
