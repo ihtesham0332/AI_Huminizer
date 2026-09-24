@@ -66,6 +66,15 @@ class HumanizerEngine:
         return HumanizeResult(out_text, results, self._report(text, out_text, results, masker, spec, tone))
 
     def humanize_sync(self, text: str, **kw) -> HumanizeResult:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(asyncio.run, self.humanize(text, **kw)).result()
         return asyncio.run(self.humanize(text, **kw))
 
     # ---------------------------------------------------------------- internals

@@ -1,51 +1,48 @@
 import os
-from typing import Optional, Any
+import httpx
+from typing import Optional, Any, List
 from langchain_ollama import ChatOllama
 
 class ModelRouter:
     """
     Abstracts LLM APIs. Configured for local open-source models via Ollama.
+    Dynamically prioritizes available models: llama3.1:8b -> qwen2.5:7b -> qwen2.5:3b.
     """
     
     def __init__(self):
-        # We default to popular open-source models. 
-        # Ensure you have pulled these in Ollama (e.g., `ollama run llama3`)
+        self.base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        self.preferred_models: List[str] = [
+            os.getenv("OLLAMA_PRIMARY_MODEL", "llama3.1:8b"),
+            os.getenv("OLLAMA_FALLBACK_MODEL", "qwen2.5:7b"),
+            "qwen2.5:3b"
+        ]
         
-        self.primary_model = ChatOllama(
-            model=os.getenv("OLLAMA_PRIMARY_MODEL", "llama3.1:8b"),
+    def _get_model_instance(self, model_name: str) -> ChatOllama:
+        return ChatOllama(
+            model=model_name,
             temperature=0.85,
             top_p=0.92,
-            base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+            base_url=self.base_url
         )
         
-        self.fallback_model = ChatOllama(
-            model=os.getenv("OLLAMA_FALLBACK_MODEL", "qwen2.5:7b"),
-            temperature=0.85,
-            top_p=0.92,
-            base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-        )
-        
-    def get_model(self, tier: str) -> Any:
-        """
-        Returns the appropriate LangChain model. Since we are local, 
-        we can just use the primary model for all tiers or split by weight if desired.
-        """
-        return self.primary_model
+    def get_model(self, tier: str = "tier1") -> Any:
+        return self._get_model_instance(self.preferred_models[0])
             
     def invoke_with_fallback(self, tier: str, prompt: str) -> str:
         """
-        Helper method to execute a prompt with automatic fallback.
+        Executes a prompt with automatic multi-model fallback.
         """
-        model = self.get_model(tier)
-        try:
-            # Execute actual LLM call to local Ollama
-            response = model.invoke(prompt)
-            return response.content
-            
-        except Exception as e:
-            print(f"Primary local model failed: {e}. Triggering fallback...")
+        last_error = None
+        for model_name in self.preferred_models:
             try:
-                fallback_response = self.fallback_model.invoke(prompt)
-                return fallback_response.content
-            except Exception as fallback_error:
-                return f"Error: Local Ollama models failed. Is Ollama running on localhost:11434? Details: {fallback_error}"
+                model = self._get_model_instance(model_name)
+                response = model.invoke(prompt)
+                content = response.content if hasattr(response, "content") else str(response)
+                if content and not content.startswith("Error:"):
+                    return content
+            except Exception as e:
+                last_error = e
+                print(f"Model '{model_name}' invocation failed: {e}. Trying next local model...")
+                continue
+                
+        return f"Error: All local Ollama models failed. Details: {last_error}"
