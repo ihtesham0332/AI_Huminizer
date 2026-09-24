@@ -72,20 +72,34 @@ class BurstinessRhythmLayer:
 
             modulated_sentences.append(s)
 
-        # 2. Prevent consecutive repetitive sentence openers (e.g. "It... It...", "This... This...")
+        # 2. Prevent repetitive sentence openers (e.g. "It... It...", "It's... It's...")
         diversified_sentences: List[str] = []
-        prev_first_word = ""
+        prev_root = ""
+        it_count = 0
         for s in modulated_sentences:
             words = s.split()
             if words:
-                first_word = words[0].lower().rstrip(",:;")
-                if first_word and first_word == prev_first_word and first_word in ("it", "this", "the", "a", "they", "we", "he", "she"):
+                first_word = words[0].lower().rstrip(",:;.")
+                root_word = first_word.replace("'s", "").replace("’s", "")
+                
+                if root_word in ("it", "this"):
+                    it_count += 1
+                else:
+                    it_count = 0
+
+                if (root_word == prev_root and root_word in ("it", "this", "the", "a", "they", "we", "he", "she")) or it_count >= 2:
                     # Vary the opener
-                    if first_word in ("it", "this"):
-                        s = "That " + " ".join(words[1:])
-                    elif first_word == "the":
+                    if root_word in ("it", "this"):
+                        if first_word in ("it's", "its"):
+                            s = "That's " + " ".join(words[1:])
+                        elif len(words) > 2 and words[1].lower() in ("helps", "allows", "makes"):
+                            s = "Doing so " + " ".join(words[1:])
+                        else:
+                            s = "In practice, " + words[0].lower() + " " + " ".join(words[1:])
+                    elif root_word == "the":
                         s = "All the " + " ".join(words[1:])
-                prev_first_word = words[0].lower().rstrip(",:;") if words else ""
+                
+                prev_root = root_word
             diversified_sentences.append(s)
 
         # 3. Clean up spacing

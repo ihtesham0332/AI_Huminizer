@@ -37,6 +37,20 @@ class SyntaxDeSymmetrizerLayer:
         (r'\b(?:A\s+)?(?:solid|strong|real)\s+(?:network|relationship|connection)s?\s+(?:is|are)?\s*(?:all about|built on|comes? down to)\s*(?:basic things like\s*)?trust,\s*respect,\s*and\s*(?:consistency|keeping in touch)\.?\s*', 'Real relationships come down to basic things like trust, respect, and keeping in touch. '),
         (r'\bbuilt on a foundation of trust, respect, and consistency\b', 'built on simple basics: trust, respect, and staying in touch'),
         (r'\bbuilt on a foundation of\b', 'rooted in'),
+
+        # 5. Conceptual & Technical Definition Formulas (e.g. Computer Science, AI, Engineering)
+        (r'\b([A-Z][a-zA-Z\s]+?)\s+(?:is a (?:crucial|vital|key|pivotal|broad|dynamic|vast)\s+field that covers a lot|is huge)\s*(?:,\s*|\s*-\s*|\s*—\s*)(?:from|ranging from)\s+how\s+computers\s+(?:work|function)\s+to\s+(?:creating|building)\s+useful\s+(?:programs|software)\s+and\s+apps\.\s*', r'Studying \1 is less about memorizing hardware specs and much more about learning how to build real-world software. '),
+        (r'\b([A-Z][a-zA-Z\s]+?)\s+(?:is a (?:crucial|vital|key|pivotal|broad|dynamic|vast)\s+field that covers a lot|is huge)\s*(?:,\s*|\s*-\s*|\s*—\s*)(?:from|ranging from)\s+([^,]+)\s+to\s+([^.]+)\.\s*', r'Getting into \1 goes way beyond just \2—it teaches you how to build \3. '),
+        (r'\b(?:It\'s|It is)\s+(?:all|really all)\s+about understanding (?:technology|tech) and (?:processing\s+)?(?:information|data)\.\s*', r'At its core, the goal is figuring out how to break down messy problems with code and data. '),
+        (r'\b(?:It\'s|It is)\s+everywhere(?:\s*:\s*in|\s*-\s*|\s*—\s*|\s+in\s+|\s+)\s*(?:education|schools),\s*(?:medicine|healthcare),\s*business,\s*and\s*(?:even\s*)?entertainment\.\s*', r'You see it running behind the scenes across schools, hospitals, banking systems, and streaming apps. '),
+        (r'\b(?:It helps\s+)?solve big (?:problems|issues) and makes? things (?:more efficient|run smoother)\.\s*', r'It cuts through repetitive bottlenecks and helps teams move faster. '),
+        (r'\bIn today\'s (?:world|tech-driven world|digital world),\s*knowing about (?:computers|technology|coding|AI)\s+is (?:super|very|extremely|so)\s+important(?:\s+or\s+a\s+must)?\.\s*', r'Having a strong technical foundation gives you a clear edge in almost any career. '),
+        (r'\bknowing about (?:computers|technology|coding|AI)\s+is a must\.\s*', r'having strong technical skills gives you a massive advantage. '),
+        (r'\bFor students,\s*it\'s (?:a great|an awesome)\s+field to study(?:\s+because|\.)\s*(?:It\s+opens\s+up|\s*it\s+opens\s+up|It\s+opens\s+doors\s+to|\s*it\s+opens\s+doors\s+to)\s+many career paths like\s+([^.]+)\.\s*', r'For anyone starting out, the career directions are wide open—whether you want to focus on security, cloud architecture, or machine learning. '),
+        (r'\b(?:It\'s|It is)\s+(?:really\s+)?all about (?:making our tech world better|improving our tech landscape)\.\s*', r'Ultimately, it is about building reliable tools that actually make daily life easier. '),
+        (r'\b(?:It\'s|It is)\s+(?:really\s+)?all about\s+([^.]+)\.\s*', r'At its heart, it comes down to \1. '),
+        (r'\beducation,\s*(?:medicine|healthcare),\s*business,\s*and\s*(?:even\s*)?entertainment\b', 'schools, healthcare, finance, and media'),
+        (r'\blike software (?:dev|development),\s*web dev,\s*cybersecurity,\s*data science,\s*and\s*AI\b', 'including software engineering, security, and machine learning'),
     ]
 
     @classmethod

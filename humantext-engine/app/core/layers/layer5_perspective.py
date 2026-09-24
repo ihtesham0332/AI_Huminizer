@@ -63,6 +63,11 @@ class PragmaticPerspectiveLayer:
 
         # 6. Clean up residual introductory filler and deduplicate identical/redundant statements
         result = re.sub(r'\bWhat struck me was that\s+(A\s+lot of folks\b)', r'\1', result, flags=re.IGNORECASE)
+        result = re.sub(r'\b(At its heart,?\s*){2,}', 'At its heart, ', result, flags=re.IGNORECASE)
+        result = re.sub(r'\b(At its core,?\s*){2,}', 'At its core, ', result, flags=re.IGNORECASE)
+        result = re.sub(r'\b(In practice,?\s*){2,}', 'In practice, ', result, flags=re.IGNORECASE)
+        result = re.sub(r'\b(Basically,?\s*){2,}', 'Basically, ', result, flags=re.IGNORECASE)
+        result = re.sub(r'\b(Ultimately,?\s*){2,}', 'Ultimately, ', result, flags=re.IGNORECASE)
         
         # Deduplicate sentences that express the exact same point redundantly
         sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result) if s.strip()]
