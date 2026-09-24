@@ -23,20 +23,38 @@ export default function Dashboard() {
     setOriginalText(text);
     setIsProcessing(true);
     
+    const payload = {
+      text: text,
+      mode: processingMode.split(' ')[0].toLowerCase(), // e.g. "balanced", "ghost", "deep", "creative"
+      length: outputLength.split(' ')[0].toLowerCase(), // e.g. "maintain", "condense", "expand"
+      profile_instructions: activeProfile === 'Custom Profile' ? profileInstructions : null
+    };
+
     try {
-      const response = await fetch('http://localhost:8000/api/v1/humanize/v5', {
+      // Primary: Use internal Next.js API proxy for stable, resilient routing
+      let response = await fetch('/api/humanize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          text: text,
-          mode: processingMode.split(' ')[0].toLowerCase(), // e.g. "balanced", "ghost", "deep", "creative"
-          length: outputLength.split(' ')[0].toLowerCase(), // e.g. "maintain", "condense", "expand"
-          profile_instructions: activeProfile === 'Custom Profile' ? profileInstructions : null
-        })
+        body: JSON.stringify(payload)
       });
       
+      // Fallback: Direct backend call if proxy is unreachable
+      if (!response.ok && response.status === 502) {
+        try {
+          response = await fetch('http://localhost:8000/api/v1/humanize/v5', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+          });
+        } catch {
+          // Keep initial response if direct call also fails
+        }
+      }
+
       const data = await response.json();
       
       if (response.ok) {
@@ -44,10 +62,10 @@ export default function Dashboard() {
         setFacts(data.facts_protected || []);
         setCitations(data.citations_protected || []);
       } else {
-        setHumanizedText(`Error: ${data.detail || 'Failed to connect to LangGraph Backend'}`);
+        setHumanizedText(`Error: ${data.error || data.detail || 'Failed to process document'}`);
       }
-    } catch (error) {
-      setHumanizedText('Network Error: Make sure your FastAPI backend is running and API keys are set.');
+    } catch (error: any) {
+      setHumanizedText(`Network Error: ${error?.message || 'Please ensure the backend is running on http://localhost:8000'}`);
     } finally {
       setIsProcessing(false);
       setShowDiff(true);

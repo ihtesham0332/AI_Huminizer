@@ -15,11 +15,11 @@ class LevelSpec:
 
 
 LEVELS: dict[int, LevelSpec] = {
-    1: LevelSpec("light",    2, 0.70, 0.25, 0.40, False, 0),
-    2: LevelSpec("gentle",   2, 0.80, 0.35, 0.30, False, 1),
-    3: LevelSpec("balanced", 2, 0.85, 0.55, 0.15, True,  1),
-    4: LevelSpec("strong",   2, 0.90, 0.70, 0.10, True,  1),
-    5: LevelSpec("deep",     2, 0.95, 0.85, 0.05, True,  1),
+    1: LevelSpec("light",    1, 0.70, 0.25, 0.40, False, 0),
+    2: LevelSpec("gentle",   1, 0.80, 0.35, 0.30, False, 0),
+    3: LevelSpec("balanced", 1, 0.85, 0.55, 0.15, True,  0),
+    4: LevelSpec("strong",   1, 0.90, 0.70, 0.10, True,  1),
+    5: LevelSpec("deep",     1, 0.95, 0.85, 0.05, True,  1),
 }
 
 TONES: dict[str, str] = {
