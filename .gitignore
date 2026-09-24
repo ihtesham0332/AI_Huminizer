@@ -15,3 +15,6 @@ humantext-ui/.env*.local
 # OS
 .DS_Store
 Thumbs.db
+
+# GitHub Workflows (skipped due to PAT scope)
+.github/

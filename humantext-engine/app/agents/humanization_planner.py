@@ -16,16 +16,16 @@ def plan_humanization_node(state: dict) -> dict:
     llm = ChatOllama(model="qwen2.5:3b", temperature=0.1, format="json")
     
     prompt = PromptTemplate.from_template(
-        "You are an expert AI Humanization Planner.\n"
-        "Your job is to determine the best strategy to make the text sound natural and human, "
-        "while protecting the provided facts and citations.\n\n"
+        "You are an elite Anti-AI Detection Strategist.\n"
+        "Your job is to determine the best strategy to make the text sound natural, human, and completely undetectable by AI detectors (like GPTZero and Quillbot), "
+        "while absolutely protecting the provided facts and citations.\n\n"
         "Input Metadata: {metadata}\n"
         "Protected Tokens (DO NOT ALTER THESE): {protected}\n"
-        "Requested Rewrite Strength: {strength} (If light, minimize structural changes. If aggressive, restructure paragraphs entirely).\n\n"
+        "Requested Rewrite Strength: {strength} (If aggressive, restructure paragraphs entirely to break AI patterns).\n\n"
         "Return a JSON object with exactly these keys:\n"
-        "- 'sentence_variation': 'high', 'medium', or 'low'\n"
-        "- 'vocabulary_change': 'high', 'medium', or 'low'\n"
-        "- 'tone_adjustment': A short string describing the required tone (e.g. 'Maintain academic formality but increase sentence length variance').\n\n"
+        "- 'sentence_variation': MUST BE 'high'. Mandate drastic variations between short, punchy sentences and longer, complex ones (Burstiness).\n"
+        "- 'vocabulary_change': MUST BE 'high'. Mandate replacing predictable AI words with conversational, slightly imperfect phrasing (Perplexity).\n"
+        "- 'tone_adjustment': A short string describing the required tone (e.g. 'Use extreme burstiness, highly colloquial phrasing, and active voice. Strictly avoid all formal or corporate AI tropes.').\n\n"
         "Text to plan for:\n{text}"
     )
     

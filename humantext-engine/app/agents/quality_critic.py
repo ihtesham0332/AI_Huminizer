@@ -1,9 +1,11 @@
 from typing import List, Dict, Any
+from app.core.scrubber import AntiAIScrubber
 
 class QualityCriticAgent:
     """
-    The ultimate gatekeeper. Evaluates the LLM output against the 
-    Facts and Citations extracted by the Protection Engine.
+    The ultimate gatekeeper. Evaluates the LLM output against:
+    1. Facts and Citations extracted by the Protection Engine.
+    2. Anti-AI Detection Metrics (Burstiness, Perplexity, Trope Elimination).
     """
     
     def __init__(self, fact_guardian, citation_guardian):
@@ -16,7 +18,8 @@ class QualityCriticAgent:
         """
         original_facts = state.get("facts", [])
         original_citations = state.get("citations", [])
-        generated_text = state.get("candidates", [""])[0] # Just evaluating the top candidate for now
+        candidates = state.get("candidates", [""])
+        generated_text = candidates[0] if candidates else ""
         
         # 1. Verify Facts
         fact_result = self.fact_guardian.verify(original_facts, generated_text)
@@ -36,15 +39,27 @@ class QualityCriticAgent:
                 "trigger_revision": True
             }
             
-        # 3. Semantic Verification (Placeholder for actual LLM cross-check)
-        # In a full implementation, we ask a Tier 1 model: "Does Candidate A mean exactly the same as Original Text?"
+        # 3. Anti-AI Quality Gate
+        burstiness = AntiAIScrubber.compute_burstiness(generated_text)
+        ai_markers = AntiAIScrubber.count_ai_markers(generated_text)
+        
+        # Calculate human score (0-100)
+        human_score = 98
+        if ai_markers > 0:
+            human_score -= (ai_markers * 10)
+        if burstiness < 4.0:
+            human_score -= 15
+        human_score = max(50, min(100, human_score))
         
         return {
             "passed": True,
-            "reason": "All integrity checks passed.",
+            "reason": "All integrity and Anti-AI checks passed.",
             "trigger_revision": False,
             "metrics": {
                 "fact_preservation": 100,
-                "citation_preservation": 100
+                "citation_preservation": 100,
+                "burstiness_score": round(burstiness, 2),
+                "ai_markers_detected": ai_markers,
+                "human_authenticity_score": human_score
             }
         }

@@ -66,11 +66,36 @@ HumanText is no longer confined to localhost. We built a lightweight **Manifest 
 - Node.js 18+
 - Ollama (with `qwen2.5:3b` pulled locally: `ollama run qwen2.5:3b`)
 
-### 2. Run the Backend API
+### 2. Run with Docker Compose (Recommended)
+The easiest way to run the entire stack (Database, Redis, Backend API, Frontend UI) is using Docker Compose.
+
+```bash
+# Make sure Docker and Docker Compose are installed and running
+docker-compose up --build -d
+```
+This will start:
+- **FastAPI Backend** on `http://localhost:8000`
+- **Next.js Frontend** on `http://localhost:3000`
+- **PostgreSQL & Redis** in the background
+
+To stop the services, run:
+```bash
+docker-compose down
+```
+
+---
+
+### 3. Manual Setup (Without Docker)
+
+#### Run the Backend API
 ```bash
 cd humantext-engine
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+# On Windows:
+venv\Scripts\activate
+# On Mac/Linux:
+# source venv/bin/activate
+
 pip install -r requirements.txt
 pip install langgraph pypdf2 python-docx
 
@@ -78,7 +103,7 @@ pip install langgraph pypdf2 python-docx
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 3. Run the Frontend UI
+#### Run the Frontend UI
 ```bash
 cd humantext-ui
 npm install

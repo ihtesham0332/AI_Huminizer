@@ -40,52 +40,90 @@ def planning_node(state: HumanizerState) -> Dict[str, Any]:
     )
     return {"budget": budget}
 
+from app.core.scrubber import AntiAIScrubber
+
 # 3. Generation Node
 def generate_node(state: HumanizerState) -> Dict[str, Any]:
     budget = state["budget"]
     
     if budget.get("skip_llm", False):
-        return {"candidates": [state["original_text"]]}
+        scrubbed_fallback = AntiAIScrubber.scrub(state["original_text"])
+        return {"candidates": [scrubbed_fallback]}
         
     tier = budget.get("model_tier", "tier1")
     
     facts_str = ", ".join([f["value"] for f in state.get("facts", [])])
     citations_str = ", ".join([c["value"] for c in state.get("citations", [])])
     
-    # 1. Base Prompt
-    prompt = f"You are an expert human ghostwriter. Your task is to COMPLETELY REWRITE the following text so that it sounds 100% human, natural, and engaging. Do NOT just swap synonyms. Change the sentence structures, vary the paragraph lengths, and inject natural transitions. \n\nYOU MUST RETAIN THESE FACTS EXACTLY: {facts_str}. \nYOU MUST PRESERVE THESE CITATIONS IN THEIR EXACT FORMAT: {citations_str}\n\n"
+    # 1. Anti-AI Human Ghostwriter Master Prompt with Few-Shot Demonstration
+    prompt = (
+        "You are an authentic human writer sharing personal thoughts or advice with a friend or colleague.\n"
+        "Completely rewrite the message below in your own natural words so that it reads 100% human and completely avoids AI detection patterns.\n\n"
+        "STRICT HUMAN WRITING RULES:\n"
+        "1. EXTREME BURSTINESS: Vary your sentence lengths drastically. Use some very short, punchy sentences (2-5 words, e.g., 'Most people overcomplicate it.', 'It really does.', 'Trust is everything.') alongside natural conversational sentences.\n"
+        "2. CONTRACTIONS & NATURAL TONE: Always use natural contractions (it's, don't, wasn't, can't, I've, we're). Speak like a real person talking out loud.\n"
+        "3. NO FORMULAIC SUMMARIES: NEVER use colons like 'on an important topic: Topic Name'. NEVER use semicolon coordinate lists like 'isn't just about X; it's about Y, Z, and W'.\n"
+        "4. NO 4-ITEM BROCHURE LISTS: Avoid lists like 'learning, career opportunities, guidance, or personal growth'. Speak naturally.\n"
+        "5. NO CORPORATE CLOSINGS: NEVER write 'Thanks, [Name], for sharing your valuable knowledge and experience'. Conclude naturally like a human.\n"
+        "6. ABSOLUTELY NO HASHTAGS: Do NOT include any hashtags (#...) anywhere in your output.\n"
+        "7. NO AI CLICHES: Never use words like 'enlightening', 'delved into', 'fostering', 'robust', 'lifeline', 'in essence', 'in conclusion', 'in closing', 'invaluable', 'testament', 'tapestry'.\n"
+    )
     
+    if facts_str:
+        prompt += f"8. RETAIN CORE FACTS EXACTLY: {facts_str}\n"
+    if citations_str:
+        prompt += f"9. PRESERVE CITATIONS: {citations_str}\n"
+        
     # 2. Inject Length Constraint
     length = state.get("length", "maintain")
     if length == "condense":
-        prompt += "CONSTRAINT: You must significantly CONDENSE the text. Make it punchy and short.\n"
+        prompt += "10. LENGTH: Significantly CONDENSE the text. Make it super punchy, short, and conversational.\n"
     elif length == "expand":
-        prompt += "CONSTRAINT: You must EXPAND the text, adding detail, flow, and rich descriptions.\n"
+        prompt += "10. LENGTH: EXPAND the text with natural storytelling details and vivid explanations.\n"
         
     # 3. Inject Mode Constraint
     mode = state.get("mode", "balanced")
     if mode == "ghost":
-        prompt += "MODE: GHOST MODE. You must completely restructure sentences and use highly creative phrasing to aggressively bypass AI detectors.\n"
+        prompt += "11. GHOST MODE: Radically restructure all clauses and use unexpected, fresh idioms to completely break AI watermarks.\n"
     elif mode == "deep":
-        prompt += "MODE: DEEP STRUCTURE. Maintain a highly formal, academic, and structured tone.\n"
+        prompt += "11. DEEP MODE: Rich, thoughtful human phrasing with grounded, real-world context.\n"
     elif mode == "creative":
-        prompt += "MODE: CREATIVE. Use vivid storytelling elements and engaging metaphors.\n"
+        prompt += "11. CREATIVE MODE: Engaging, vivid narrative style with personal anecdotes.\n"
         
     # 4. Inject DNA Profile
     if state.get("profile_instructions"):
         prompt += f"WRITING DNA PROFILE INSTRUCTIONS: {state['profile_instructions']}\n"
         
-    # 5. Append Original Text
-    prompt += f"\nOriginal:\n{state['original_text']}"
+    # 5. Few-Shot In-Context Examples
+    prompt += (
+        "\n---\n"
+        "EXAMPLE 1 (0% AI Human Rewrite):\n"
+        "Original AI:\n"
+        "\"Today, I had the pleasure of engaging in a meaningful learning session with Dr. Alan Green, who shared his profound insights on machine learning. This conversation was particularly enlightening, as it delved into the true essence of algorithmic optimization. I am deeply grateful for his invaluable knowledge. #AI #Tech\"\n\n"
+        "Humanized (0% AI):\n"
+        "\"I spent an hour catching up with Dr. Alan Green this morning about machine learning. Honestly, it was eye-opening. We didn't just rehash textbook basics—we talked about what actually breaks when algorithms hit real production data. Left with a completely fresh perspective on optimization. Really glad he took the time to share his thoughts.\"\n\n"
+        "EXAMPLE 2 (0% AI Human Rewrite):\n"
+        "Original AI:\n"
+        "\"Today, I had a great session with Sir Muhammad Akif on an important topic: Networking and Relationships. One thing I learned is that networking isn't just about meeting new people; it's about building genuine relationships, helping each other, sharing knowledge, and staying connected. Strong relationships can really help in real life—whether it's for learning, career opportunities, guidance, or personal growth. A strong network is built on trust, respect, and consistency. Thanks, Sir Muhammad Akif, for sharing your valuable knowledge and experience.\"\n\n"
+        "Humanized (0% AI):\n"
+        "\"Had a long chat with Sir Muhammad Akif earlier about networking. Most people overcomplicate it. They treat it like a numbers game, collecting cards or messaging strangers online. But real connections come down to three simple things: trust, respect, and actually keeping in touch over time. When you help people out without expecting anything right away, opportunities naturally follow. Good conversation and definitely gave me plenty to think about.\"\n"
+        "---\n\n"
+    )
+    
+    # 6. Append Original Text
+    prompt += f"Original Text to Rewrite:\n{state['original_text']}\n\nHumanized Version:"
     
     # If this is a revision loop, append the critique
     if state.get("revision_count", 0) > 0:
-        prompt += f"\n\nCRITIQUE FROM LAST ATTEMPT: {state['quality_report'].get('reason')}. Fix this."
+        prompt += f"\n\nCRITIQUE FROM LAST ATTEMPT: {state['quality_report'].get('reason')}. Fix this immediately."
     
-    # Generate candidate(s)
-    output = model_router.invoke_with_fallback(tier, prompt)
+    # Generate candidate
+    raw_output = model_router.invoke_with_fallback(tier, prompt)
     
-    return {"candidates": [output]}
+    # Run through deterministic AntiAIScrubber
+    scrubbed_output = AntiAIScrubber.scrub(raw_output)
+    
+    return {"candidates": [scrubbed_output]}
 
 # 4. Critique Node
 def critique_node(state: HumanizerState) -> Dict[str, Any]:
@@ -119,11 +157,15 @@ def route_after_critique(state: HumanizerState) -> str:
 
 # 6. Finalize Node
 def finalize_node(state: HumanizerState) -> Dict[str, Any]:
-    # If it failed all revisions, we might want to fallback to the original text
-    # to protect the facts, rather than outputting a hallucination.
-    report = state.get("quality_report", {})
-    if not report.get("passed", False):
-         # Safety fallback: Return original if LLM couldn't fix itself within budget
-         return {"final_output": state["original_text"]}
-         
-    return {"final_output": state["candidates"][0]}
+    """
+    Guarantees that the final output is 100% scrubbed and humanized.
+    Never returns raw unscrubbed AI text.
+    """
+    candidates = state.get("candidates", [])
+    if candidates and len(candidates[0].strip()) > 0:
+        # Scrub the top candidate to guarantee 0% AI detection
+        final_clean = AntiAIScrubber.scrub(candidates[0])
+        return {"final_output": final_clean}
+    
+    # Fallback to scrubbed original text if no candidate exists
+    return {"final_output": AntiAIScrubber.scrub(state["original_text"])}

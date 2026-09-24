@@ -2,21 +2,27 @@ from langchain_ollama import ChatOllama
 from langchain_core.prompts import PromptTemplate
 import concurrent.futures
 
+from app.core.scrubber import AntiAIScrubber
+
 def generate_single_candidate(text: str, plan: dict, protected: list, variant: str) -> str:
     """
     Calls the LLM to generate one specific variation.
     """
-    llm = ChatOllama(model="qwen2.5:3b", temperature=0.7)  # Higher temp for creativity
+    llm = ChatOllama(model="qwen2.5:3b", temperature=0.85, top_p=0.92)  # Higher temp for creativity
     
     prompt = PromptTemplate.from_template(
-        "You are an expert editor. Rewrite the following text to sound extremely natural and human-written.\n"
-        "Follow this strategy plan: {plan}\n\n"
-        "CRITICAL RULES:\n"
-        "1. You MUST preserve the exact semantic meaning.\n"
-        "2. You MUST NOT alter or remove any of the following protected items: {protected}\n"
-        "3. This is variant '{variant}'. Introduce slight stylistic uniqueness associated with this variant.\n\n"
+        "You are an average, everyday person writing a casual post or message.\n"
+        "Rewrite the following text so it sounds completely natural, conversational, and written by a real human. Write at an 8th-grade reading level.\n\n"
+        "Strategy: {plan}\n\n"
+        "STRICT RULES:\n"
+        "1. USE SIMPLE WORDS. Never use formal, academic, or corporate vocabulary. Do NOT use words like 'profound', 'enlightening', 'moreover', 'crucial', 'foster', 'delve', or 'tapestry'. Use words like 'great', 'also', 'important', 'help'.\n"
+        "2. BURSTINESS: Vary your sentence lengths drastically. Write some very short sentences. Then, follow them with longer ones to explain the point.\n"
+        "3. ACTIVE VOICE: Speak directly. Say 'We built a plan' instead of 'A plan was built'.\n"
+        "4. PRESERVE MEANING: Do not change the core message.\n"
+        "5. PROTECTED ITEMS: You MUST NOT alter or remove any of the following protected items: {protected}\n"
+        "6. VARIANT: Your style is '{variant}'. Ensure the tone matches this exactly.\n\n"
         "Original Text:\n{text}\n\n"
-        "Rewritten Text:"
+        "Humanized Text:"
     )
     
     chain = prompt | llm
@@ -27,10 +33,11 @@ def generate_single_candidate(text: str, plan: dict, protected: list, variant: s
             "protected": str(protected),
             "variant": variant
         })
-        return response.content.strip() if hasattr(response, "content") else str(response).strip()
+        raw = response.content.strip() if hasattr(response, "content") else str(response).strip()
+        return AntiAIScrubber.scrub(raw)
     except Exception as e:
         print(f"Humanizer error on {variant}: {e}")
-        return text
+        return AntiAIScrubber.scrub(text)
 
 def humanizer_node(state: dict) -> dict:
     """
@@ -40,7 +47,8 @@ def humanizer_node(state: dict) -> dict:
     plan = state.get("rewrite_plan", {})
     protected = state.get("protected_tokens", [])
     
-    variants = ["Professional", "Conversational", "Academic"]
+    # Changed from Academic/Professional to strictly human/casual styles
+    variants = ["Highly Conversational", "Direct and Simple", "Personal Story"]
     candidates = []
     
     # Execute generation in parallel to reduce latency

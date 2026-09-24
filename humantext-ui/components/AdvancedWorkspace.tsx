@@ -9,6 +9,11 @@ interface AdvancedWorkspaceProps {
 export default function AdvancedWorkspace({ onRewrite }: AdvancedWorkspaceProps) {
   const [text, setText] = useState('');
   
+  // Robust word count calculation
+  const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+  const isOverLimit = wordCount > 2500;
+  const isDisabled = wordCount === 0 || isOverLimit;
+
   return (
     <div className="glass-panel p-6 animate-fade-in">
       <div className="flex justify-between items-center mb-4">
@@ -23,19 +28,24 @@ export default function AdvancedWorkspace({ onRewrite }: AdvancedWorkspaceProps)
         placeholder="Paste your report, essay, or email here. Our Fact & Citation Guardians will automatically lock your data before humanizing..."
         value={text}
         onChange={(e) => setText(e.target.value)}
+        onInput={(e) => setText((e.target as HTMLTextAreaElement).value)}
       />
       
       <div className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4 border-t border-gray-800 pt-6">
-        <div className="text-gray-400 text-sm w-full sm:w-auto text-center sm:text-left">
-          <span className="font-mono text-white">{text.split(/\s+/).filter(w => w.length > 0).length}</span> 
+        <div className={`text-sm w-full sm:w-auto text-center sm:text-left ${isOverLimit ? 'text-red-400' : 'text-gray-400'}`}>
+          <span className={`font-mono ${isOverLimit ? 'text-red-500 font-bold' : 'text-white'}`}>{wordCount}</span> 
           <span className="font-mono"> / 2500</span> max words accepted.
         </div>
         <button 
           onClick={() => onRewrite(text)}
-          disabled={!text}
-          className="bg-gradient-hover px-8 py-3 rounded-lg font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+          disabled={isDisabled}
+          className={`px-8 py-3 rounded-lg font-bold text-white transition-all w-full sm:w-auto ${
+            isDisabled 
+              ? 'bg-gray-700 opacity-50 cursor-not-allowed' 
+              : 'bg-gradient-hover cursor-pointer shadow-lg hover:shadow-blue-500/20'
+          }`}
         >
-          Analyze & Humanize
+          {isOverLimit ? 'Word Limit Exceeded' : 'Analyze & Humanize'}
         </button>
       </div>
     </div>
