@@ -12,7 +12,7 @@ class ModelRouter:
         # Ensure you have pulled these in Ollama (e.g., `ollama run llama3`)
         
         self.primary_model = ChatOllama(
-            model=os.getenv("OLLAMA_PRIMARY_MODEL", "qwen2.5:3b"),
+            model=os.getenv("OLLAMA_PRIMARY_MODEL", "llama3.1:8b"),
             temperature=0.85,
             top_p=0.92,
             base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")

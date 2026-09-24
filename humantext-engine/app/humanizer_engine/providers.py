@@ -32,32 +32,46 @@ class AnthropicProvider:
 
 
 class OllamaProvider:
-    """Local provider using Ollama (qwen2.5:3b or qwen2.5:7b)."""
+    """Local provider using Ollama (llama3.1:8b 4-bit quantized, with fallbacks)."""
     def __init__(self, model: str | None = None, base_url: str | None = None) -> None:
         import httpx
-        self.model = model or os.getenv("OLLAMA_PRIMARY_MODEL", "qwen2.5:3b")
+        self.model = model or os.getenv("OLLAMA_PRIMARY_MODEL", "llama3.1:8b")
+        self.fallback_models = [os.getenv("OLLAMA_FALLBACK_MODEL", "qwen2.5:7b"), "qwen2.5:3b"]
         self.base_url = (base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")).rstrip("/")
         self.name = f"ollama:{self.model}"
         self._client = httpx.AsyncClient(base_url=self.base_url, timeout=120.0)
 
     async def complete(self, system: str, user: str, *, temperature: float, max_tokens: int, seed: int = 0) -> str:
-        payload = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user}
-            ],
-            "options": {
-                "temperature": min(max(temperature, 0.1), 1.0),
-                "top_p": 0.92,
-                "seed": seed
-            },
-            "stream": False
-        }
-        res = await self._client.post("/api/chat", json=payload)
-        res.raise_for_status()
-        data = res.json()
-        return data.get("message", {}).get("content", "").strip()
+        models_to_try = [self.model] + [m for m in self.fallback_models if m != self.model]
+        last_err = None
+        for m in models_to_try:
+            try:
+                payload = {
+                    "model": m,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user}
+                    ],
+                    "options": {
+                        "temperature": min(max(temperature, 0.1), 1.0),
+                        "top_p": 0.92,
+                        "seed": seed
+                    },
+                    "stream": False
+                }
+                res = await self._client.post("/api/chat", json=payload)
+                if res.status_code == 200:
+                    data = res.json()
+                    content = data.get("message", {}).get("content", "").strip()
+                    if content:
+                        return content
+            except Exception as e:
+                last_err = e
+                continue
+        if last_err:
+            raise last_err
+        return ""
+
 
 
 def _match_case(src: str, repl: str) -> str:

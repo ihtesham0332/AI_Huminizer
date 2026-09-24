@@ -8,7 +8,9 @@ def generate_single_candidate(text: str, plan: dict, protected: list, variant: s
     """
     Calls the LLM to generate one specific variation.
     """
-    llm = ChatOllama(model="qwen2.5:3b", temperature=0.85, top_p=0.92)  # Higher temp for creativity
+    import os
+    model_name = os.getenv("OLLAMA_PRIMARY_MODEL", "llama3.1:8b")
+    llm = ChatOllama(model=model_name, temperature=0.85, top_p=0.92)  # Higher temp for creativity
     
     prompt = PromptTemplate.from_template(
         "You are an average, everyday person writing a casual post or message.\n"
